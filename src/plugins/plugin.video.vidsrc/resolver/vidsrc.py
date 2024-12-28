@@ -199,8 +199,8 @@ def resolve(movie_id):
       xbmc.log(f"FAILED {script.text}.", level=xbmc.LOGINFO)
 
   if not jumpsrc:
-    message = f"Jump src not found from {iframe1src}."
-    xbmc.log(message, level=xbmc.LOGINFO)
+    message = "Jump src not found"
+    xbmc.log(f"{message} from {iframe1src}.", level=xbmc.LOGINFO)
     raise Exception(message)
 
   jumpsrc = 'http://' + extract_domain(iframe1src) + '/' + jumpsrc

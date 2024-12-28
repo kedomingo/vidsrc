@@ -199,16 +199,18 @@ def resolve(movie_id):
       xbmc.log(f"FAILED {script.text}.", level=xbmc.LOGINFO)
 
   if not jumpsrc:
-    xbmc.log(f"Jump src not found from {iframe1src}.", level=xbmc.LOGINFO)
-    return None
+    message = "Jump src not found"
+    xbmc.log(f"{message} from {iframe1src}.", level=xbmc.LOGINFO)
+    raise Exception(message)
 
   jumpsrc = 'http://' + extract_domain(iframe1src) + '/' + jumpsrc
 
   # jumpsrc = 'http://localhost:7070'
   response = requests.get(jumpsrc, headers=headers)
   if response.status_code >= 400:
-    xbmc.log(f"Request to {jumpsrc} failed", level=xbmc.LOGINFO)
-    return None
+    message = f"Request to {jumpsrc} failed"
+    xbmc.log(message, level=xbmc.LOGINFO)
+    raise Exception(message)
 
   soup = BeautifulSoup(response.text, 'html.parser')
 
@@ -224,8 +226,14 @@ def resolve(movie_id):
       break
 
   if not urldiv:
-    xbmc.log(f"Could not find the file location to decode from {jumpsrc}",
-             level=xbmc.LOGINFO)
-    return None
+    message = f"Could not find the file location to decode from {jumpsrc}"
+    xbmc.log(message, level=xbmc.LOGINFO)
+    raise Exception(message)
 
-  return decode_bruteforce(urldiv.text)
+  decoded = decode_bruteforce(urldiv.text)
+  if not decoded:
+    message = "Could not find algorithm to decode file URL"
+    xbmc.log(f"{message} {urldiv.text} {response.text}", level=xbmc.LOGINFO)
+    raise Exception(message)
+
+  return decoded

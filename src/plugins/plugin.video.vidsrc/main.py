@@ -171,7 +171,7 @@ def play_movie(movie_id):
   try:
     playback_url = vidsrc.resolve(movie_id)
   except Exception as e:
-    error_message = e
+    error_message = f"- {e}"
 
   if playback_url is None:
     show_notification("Error", f"Could not resolve movie {movie_id} {error_message}")
