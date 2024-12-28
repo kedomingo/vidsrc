@@ -1,3 +1,4 @@
+import math
 import sys
 import xbmc
 import xbmcgui
@@ -9,7 +10,8 @@ from urllib.parse import quote
 from resolver import vidsrc
 
 BASE_URL = "https://api.themoviedb.org/3"
-IMAGE_BASE_URL = "https://image.tmdb.org/t/p/w185"
+THUMB_BASE_URL = "https://image.tmdb.org/t/p/w185"
+IMAGE_BASE_URL = "https://image.tmdb.org/t/p/w500"
 API_KEY = "d75677fb857aa6f339c67d9ba89f9aed"  # DO NOT COMMIT
 
 ADDON_HANDLE = int(sys.argv[1])
@@ -54,29 +56,12 @@ def list_trending(page):
   url = f"{BASE_URL}/trending/movie/day?api_key={API_KEY}&page={page}"
   data = get_json(url)
 
-  if page > 1:
-    main_url = build_url({})
-    xbmcplugin.addDirectoryItem(ADDON_HANDLE, main_url,
-                                xbmcgui.ListItem('Back to main page'), True)
-
-    prev_url = build_url({'action': 'trending', 'page': page - 1})
-    xbmcplugin.addDirectoryItem(ADDON_HANDLE, prev_url,
-                                xbmcgui.ListItem('Previous page'), True)
+  __previous_pages(page, {'action': 'trending'})
 
   for movie in data['results']:
-    title = f"{movie['title']} ({movie['release_date'][:4] if 'release_date' in movie and movie['release_date'] else 'N/A'})"
-    list_item = xbmcgui.ListItem(title)
-    list_item.setArt({'poster': IMAGE_BASE_URL + movie[
-      'poster_path'] if 'poster_path' in movie and movie[
-      'poster_path'] else ''})
-    list_item.setProperty("IsPlayable", 'True')
-    url = build_url({'action': 'play_movie', 'id': movie['id']})
-    xbmcplugin.addDirectoryItem(ADDON_HANDLE, url, list_item, False)
+    __list_movie(movie)
 
-  if page < data['total_pages']:
-    next_url = build_url({'action': 'trending', 'page': page + 1})
-    xbmcplugin.addDirectoryItem(ADDON_HANDLE, next_url,
-                                xbmcgui.ListItem('Next page'), True)
+  __next_pages(page, data['total_pages'], {'action': 'trending'})
 
   xbmcplugin.endOfDirectory(ADDON_HANDLE)
 
@@ -98,31 +83,20 @@ def list_movies_by_genre(genre_id, genre_name, page):
   url = f"{BASE_URL}/discover/movie?api_key={API_KEY}&with_genres={genre_id}&page={page}"
   data = get_json(url)
 
-  if page > 1:
-    main_url = build_url({})
-    xbmcplugin.addDirectoryItem(ADDON_HANDLE, main_url,
-                                xbmcgui.ListItem('Back to main page'), True)
-
-    prev_url = build_url({'action': 'movies_by_genre', 'genre_id': genre_id,
-                          'genre_name': genre_name, 'page': page - 1})
-    xbmcplugin.addDirectoryItem(ADDON_HANDLE, prev_url,
-                                xbmcgui.ListItem('Previous page'), True)
+  __previous_pages(page, {
+    'action': 'movies_by_genre',
+    'genre_id': genre_id,
+    'genre_name': genre_name
+  })
 
   for movie in data['results']:
-    title = f"{movie['title']} ({movie['release_date'][:4] if 'release_date' in movie and movie['release_date'] else 'N/A'})"
-    list_item = xbmcgui.ListItem(title)
-    list_item.setArt({'poster': IMAGE_BASE_URL + movie[
-      'poster_path'] if 'poster_path' in movie and movie[
-      'poster_path'] else ''})
-    list_item.setProperty("IsPlayable", 'True')
-    url = build_url({'action': 'play_movie', 'id': movie['id']})
-    xbmcplugin.addDirectoryItem(ADDON_HANDLE, url, list_item, False)
+    __list_movie(movie)
 
-  if page < data['total_pages']:
-    next_url = build_url({'action': 'movies_by_genre', 'genre_id': genre_id,
-                          'genre_name': genre_name, 'page': page + 1})
-    xbmcplugin.addDirectoryItem(ADDON_HANDLE, next_url,
-                                xbmcgui.ListItem('Next page'), True)
+  __next_pages(page, data['total_pages'], {
+    'action': 'movies_by_genre',
+    'genre_id': genre_id,
+    'genre_name': genre_name
+  })
 
   xbmcplugin.endOfDirectory(ADDON_HANDLE)
 
@@ -140,25 +114,12 @@ def search_movies(query, page):
   url = f"{BASE_URL}/search/movie?api_key={API_KEY}&query={quote(query)}&page={page}"
   data = get_json(url)
 
-  if page > 1:
-    prev_url = build_url({'action': 'search', 'query': query, 'page': page - 1})
-    xbmcplugin.addDirectoryItem(ADDON_HANDLE, prev_url,
-                                xbmcgui.ListItem('Previous page'), True)
+  __previous_pages(page, {'action': 'search', 'query': query})
 
   for movie in data['results']:
-    title = f"{movie['title']} ({movie['release_date'][:4] if 'release_date' in movie and movie['release_date'] else 'N/A'})"
-    list_item = xbmcgui.ListItem(title)
-    list_item.setArt({'poster': IMAGE_BASE_URL + movie[
-      'poster_path'] if 'poster_path' in movie and movie[
-      'poster_path'] else ''})
-    list_item.setProperty("IsPlayable", 'True')
-    url = build_url({'action': 'play_movie', 'id': movie['id']})
-    xbmcplugin.addDirectoryItem(ADDON_HANDLE, url, list_item, False)
+    __list_movie(movie)
 
-  if page < data['total_pages']:
-    next_url = build_url({'action': 'search', 'query': query, 'page': page + 1})
-    xbmcplugin.addDirectoryItem(ADDON_HANDLE, next_url,
-                                xbmcgui.ListItem('Next page'), True)
+  __next_pages(page, data['total_pages'], {'action': 'search', 'query': query})
 
   xbmcplugin.endOfDirectory(ADDON_HANDLE)
 
@@ -174,7 +135,8 @@ def play_movie(movie_id):
     error_message = f"- {e}"
 
   if playback_url is None:
-    show_notification("Error", f"Could not resolve movie {movie_id} {error_message}")
+    show_notification("Error",
+                      f"Could not resolve movie {movie_id} {error_message}")
     xbmc.log(f"Could not resolve movie {movie_id}", level=xbmc.LOGINFO)
     return
 
@@ -185,6 +147,104 @@ def play_movie(movie_id):
   xbmcplugin.setResolvedUrl(handle=ADDON_HANDLE, succeeded=True,
                             listitem=list_item)
 
+
+def __list_movie(movie):
+  title = f"{movie['title']} ({movie['release_date'][:4] if 'release_date' in movie and movie['release_date'] else 'N/A'})"
+  rating = f"{round(movie['vote_average'], 2)} ({movie['vote_count']})"
+  normalized_rating = __normalize_score(movie['popularity'], 1500,
+                                        movie['vote_count'],
+                                        movie['vote_average'])
+  plot = f"{movie['overview']}\n\nRating: {rating}\nNormalized Rating: {normalized_rating}"
+  backdrop = movie['backdrop_path'] if 'backdrop_path' in movie and movie[
+    'backdrop_path'] else ''
+  poster = movie['poster_path'] if 'poster_path' in movie and movie[
+    'poster_path'] else ''
+
+  list_item = xbmcgui.ListItem(title)
+  list_item.setArt(
+      {
+        'poster': IMAGE_BASE_URL + (poster if poster else backdrop),
+        'banner': IMAGE_BASE_URL + (backdrop if backdrop else poster),
+        'thumb': THUMB_BASE_URL + (poster if poster else backdrop),
+        'icon': THUMB_BASE_URL + (poster if poster else backdrop)
+      }
+  )
+  list_item.setInfo(type="video", infoLabels={
+    'title': title,
+    'plot': plot,
+    'Rating': str(normalized_rating)
+  })
+  list_item.setProperty("IsPlayable", 'True')
+  url = build_url({'action': 'play_movie', 'id': movie['id']})
+  xbmcplugin.addDirectoryItem(ADDON_HANDLE, url, list_item, False)
+
+
+def __normalize_score(popularity, max_popularity, reviews, review_score):
+  # popularity decreases in importance is it increases
+  pop_factor = math.log(popularity + 50, 10) / math.log(max_popularity + 1, 10)
+  # review factor increases drastically as reviews increase
+  review_transition_score = 1.2
+  review_factor = reviews * review_transition_score / 10
+  if reviews > 10:
+    review_factor = review_transition_score + ((reviews - 10) * 0.9 / 89)
+
+  # bound to 0-10
+  return round(max(0, min(review_score * pop_factor * review_factor, 10)), 2)
+
+
+def on_action(action, control_id):
+  xbmc.log(f"ListItem Action: {action}", level=xbmc.LOGINFO)
+
+
+def __previous_pages(page, params):
+  if page > 1:
+    main_url = build_url({})
+    xbmcplugin.addDirectoryItem(ADDON_HANDLE, main_url,
+                                xbmcgui.ListItem('Back to main page'), True)
+
+    prev_url = build_url(__append_dicts(params, {'page': 1}))
+    xbmcplugin.addDirectoryItem(ADDON_HANDLE, prev_url,
+                                xbmcgui.ListItem('First'), True)
+
+  if page > 10:
+    prev_url = build_url(__append_dicts(params, {'page': page - 10}))
+    xbmcplugin.addDirectoryItem(ADDON_HANDLE, prev_url,
+                                xbmcgui.ListItem(f'Page {page - 10}'), True)
+
+  if page > 2:
+    prev_url = build_url(__append_dicts(params, {'page': page - 1}))
+    xbmcplugin.addDirectoryItem(ADDON_HANDLE, prev_url,
+                                xbmcgui.ListItem(f'Page {page - 1}'), True)
+
+
+def __next_pages(page, total_pages, params):
+  if page < total_pages:
+    next_url = build_url(__append_dicts(params, {'page': page + 1}))
+    xbmcplugin.addDirectoryItem(ADDON_HANDLE, next_url,
+                                xbmcgui.ListItem(f'Page {page + 1}'), True)
+
+  if page + 2 < total_pages:
+    next_url = build_url(__append_dicts(params, {'page': page + 2}))
+    xbmcplugin.addDirectoryItem(ADDON_HANDLE, next_url,
+                                xbmcgui.ListItem(f'Page {page + 2}'), True)
+
+  if page + 5 < total_pages:
+    next_url = build_url(__append_dicts(params, {'page': page + 5}))
+    xbmcplugin.addDirectoryItem(ADDON_HANDLE, next_url,
+                                xbmcgui.ListItem(f'Page {page + 5}'), True)
+
+  if page + 1 < total_pages:
+    next_url = build_url(__append_dicts(params, {'page': total_pages - 1}))
+    xbmcplugin.addDirectoryItem(ADDON_HANDLE, next_url,
+                                xbmcgui.ListItem('Last'), True)
+
+
+def __append_dicts(dict1, dict2):
+  dict1.update(dict2)
+  return dict1
+
+
+## -----------------------------------
 
 params = parse_qs(sys.argv[2][1:])
 action = params.get('action', [None])[0]
