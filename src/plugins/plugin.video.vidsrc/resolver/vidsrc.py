@@ -66,12 +66,24 @@ def alg7(param):
   return result_str
 
 
-def alg8(param):
-  extracted = param[10:-16]
+def alg8(input_str):
+  # Extract the substring
+  extracted = input_str[10:-16]
+
+  # Decode the Base64-encoded string
   decoded = base64.b64decode(extracted).decode('utf-8')
-  key = "3SAY~#%Y(V%>5d/Yg\"$G[Lh1rK4a;7ok" * (len(decoded) // len(key) + 1)[
-                                              :len(decoded)]
-  return ''.join(chr(ord(c1) ^ ord(c2)) for c1, c2 in zip(decoded, key))
+
+  # Create the repeating key
+  key = "3SAY~#%Y(V%>5d/Yg\"$G[Lh1rK4a;7ok"
+  encrypted = (key * ((len(decoded) // len(key)) + 1))[:len(decoded)]
+
+  # XOR decryption
+  result = ''.join(
+      chr(ord(decoded[i]) ^ ord(encrypted[i]))
+      for i in range(len(decoded))
+  )
+
+  return result
 
 
 def alg9(param):
@@ -90,23 +102,34 @@ def alg9(param):
                 lambda match: rot[match.group(0)], param)
 
 
-def alg10(encoded_param):
-  reversed_str = encoded_param[::-1]
-  cleaned = reversed_str.replace('-', '+').replace('_', '/')
-  cleaned_binary = base64.b64decode(cleaned).decode('utf-8')
-  result = ''.join(chr(ord(char) - 5) for char in cleaned_binary)
+def alg10(param):
+  inverted = param[::-1]
+  cleaned = inverted.replace('-', '+').replace('_', '/')
+  binaried = base64.b64decode(cleaned)
+  result = ''.join(chr(int(char) - 5) for char in binaried)
+
   return result
 
 
 def alg11(param):
-  reversed_str = ''.join(reversed(param))
-  modified_str = reversed_str.replace('-', '+').replace('_', '/')
-  decoded_str = base64.b64decode(modified_str).decode('utf-8')
-  result_str = ''.join(chr(ord(c) - 7) for c in decoded_str)
-  return result_str
+  inverted = param[::-1]
+  cleaned = inverted.replace('-', '+').replace('_', '/')
+  binaried = base64.b64decode(cleaned)
+  result = ''.join(chr(int(char) - 7) for char in binaried)
+
+  return result
 
 
 def alg12(param):
+  inverted = param[::-1]
+  cleaned = inverted.replace('-', '+').replace('_', '/')
+  binaried = base64.b64decode(cleaned)
+  result = ''.join(chr(int(char) - 3) for char in binaried)
+
+  return result
+
+
+def alg13(param):
   # Reverse the string
   reversed_param = param[::-1]
 
@@ -118,14 +141,6 @@ def alg12(param):
       chr(int(encoded[i:i + 2], 16)) for i in range(0, len(encoded), 2))
 
   return result
-
-
-def alg13(param):
-  reversed_str = ''.join(reversed(param))
-  modified_str = reversed_str.replace('-', '+').replace('_', '/')
-  decoded_str = base64.b64decode(modified_str).decode('utf-8')
-  result_str = ''.join(chr(ord(c) - 3) for c in decoded_str)
-  return result_str
 
 
 def decode_bruteforce(str_to_decode):
