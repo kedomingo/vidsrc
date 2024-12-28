@@ -166,10 +166,15 @@ def search_movies(query, page):
 def play_movie(movie_id):
   xbmc.log(f"Resolving {movie_id}", level=xbmc.LOGINFO)
 
-  # Derive the actual URL (replace this with your logic)
-  playback_url = vidsrc.resolve(movie_id)
+  playback_url = None
+  error_message = None
+  try:
+    playback_url = vidsrc.resolve(movie_id)
+  except Exception as e:
+    error_message = e
+
   if playback_url is None:
-    show_notification("Error", f"Could not resolve movie {movie_id}")
+    show_notification("Error", f"Could not resolve movie {movie_id} {error_message}")
     xbmc.log(f"Could not resolve movie {movie_id}", level=xbmc.LOGINFO)
     return
 
