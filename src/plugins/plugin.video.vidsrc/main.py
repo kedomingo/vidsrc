@@ -132,7 +132,7 @@ def play_movie(movie_id):
   error_message = None
   try:
     # playback_url = vidsrc.resolve(movie_id)
-    result = requests.get(f"http://localhost:7070/fetch?movieid={movie_id}")
+    result = requests.get(f"http://192.168.0.137:7070/fetch?movieid={movie_id}")
     data = json.loads(result.text)
     playback_url = data['playlist'] if data['playlist'] else None
   except Exception as e:
