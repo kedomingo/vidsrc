@@ -8,6 +8,7 @@ from urllib.parse import parse_qs
 from urllib.parse import urlencode
 from urllib.parse import quote
 from resolver import vidsrc
+import json
 
 BASE_URL = "https://api.themoviedb.org/3"
 THUMB_BASE_URL = "https://image.tmdb.org/t/p/w185"
@@ -130,7 +131,10 @@ def play_movie(movie_id):
   playback_url = None
   error_message = None
   try:
-    playback_url = vidsrc.resolve(movie_id)
+    # playback_url = vidsrc.resolve(movie_id)
+    result = requests.get(f"http://localhost:7070/fetch?movieid={movie_id}")
+    data = json.loads(result.text)
+    playback_url = data['playlist'] if data['playlist'] else None
   except Exception as e:
     error_message = f"- {e}"
 
