@@ -243,11 +243,13 @@ def play_movie(movie_id):
     player = xbmc.Player()
     player.play(playback_url, list_item)
 
-    engsub = __determine_english_sub(subtitles)
     while not player.isPlaying():
       xbmc.sleep(100)
 
-    if engsub:
+    if len(subtitles) == 1:
+      engsub = str(subtitles[0])
+      if engsub.startswith('/'):
+        engsub = f'http://192.168.0.145:8080{engsub}'
       xbmc.log(f"Found engsub {engsub}", level=xbmc.LOGINFO)
       player.setSubtitles(engsub)
       return
@@ -258,19 +260,19 @@ def play_movie(movie_id):
       player.setSubtitles(subtitle_url)
 
 
-def __determine_english_sub(subtitle_urls):
-  # quick
-  for subtitle_url in subtitle_urls:
-    if re.search(r"/en-?[^/]+$", subtitle_url):
-      return subtitle_url
-
-  # slow
-  for subtitle_url in subtitle_urls:
-    subtitle_content = requests.get(subtitle_url)
-    # look for common english words
-    if re.search(' you ', subtitle_content.text) or re.search(' yes ', subtitle_content.text) or re.search(' cannot ', subtitle_content.text) or re.search(' know ', subtitle_content.text):
-      return subtitle_url
-  return None
+# def __determine_english_sub(subtitle_urls):
+#   # quick
+#   for subtitle_url in subtitle_urls:
+#     if re.search(r"/en-?[^/]+$", subtitle_url):
+#       return subtitle_url
+#
+#   # slow
+#   for subtitle_url in subtitle_urls:
+#     subtitle_content = requests.get(subtitle_url)
+#     # look for common english words
+#     if re.search(' you ', subtitle_content.text) or re.search(' yes ', subtitle_content.text) or re.search(' cannot ', subtitle_content.text) or re.search(' know ', subtitle_content.text):
+#       return subtitle_url
+#   return None
 
 
 def __list_movie(movie):
