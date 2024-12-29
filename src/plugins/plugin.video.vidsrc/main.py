@@ -1,4 +1,5 @@
 import math
+import re
 import sys
 import xbmc
 import xbmcgui
@@ -23,8 +24,9 @@ def show_notification(title, message):
   xbmcgui.Dialog().notification(title, message, xbmcgui.NOTIFICATION_INFO, 5000)
 
 
-def build_url(query):
-  return f"{sys.argv[0]}?{urlencode(query)}"
+def build_url(query, base=None):
+  base = base if base else sys.argv[0]
+  return f"{base}?{urlencode(query)}"
 
 
 def get_json(url):
@@ -38,12 +40,17 @@ def main_menu():
 
   # Add Trending option
   url = build_url({'action': 'trending', 'page': 1})
-  xbmcplugin.addDirectoryItem(ADDON_HANDLE, url, xbmcgui.ListItem('Trending'),
+  xbmcplugin.addDirectoryItem(ADDON_HANDLE, url, xbmcgui.ListItem('Trending Movies'),
                               True)
 
   # Add Genre option
   url = build_url({'action': 'genres'})
-  xbmcplugin.addDirectoryItem(ADDON_HANDLE, url, xbmcgui.ListItem('Genre'),
+  xbmcplugin.addDirectoryItem(ADDON_HANDLE, url, xbmcgui.ListItem('By Genre'),
+                              True)
+
+  # Add Periods option
+  url = build_url({'action': 'periods'})
+  xbmcplugin.addDirectoryItem(ADDON_HANDLE, url, xbmcgui.ListItem('By Period'),
                               True)
 
   # Add Find option
@@ -67,37 +74,110 @@ def list_trending(page):
   xbmcplugin.endOfDirectory(ADDON_HANDLE)
 
 
-def list_genres():
+def list_genres(params=None):
   url = f"{BASE_URL}/genre/movie/list?api_key={API_KEY}"
   data = get_json(url)
 
   for genre in data['genres']:
-    url = build_url({'action': 'movies_by_genre', 'genre_id': genre['id'],
-                     'genre_name': genre['name'], 'page': 1})
+    args = {'action': 'discover', 'genre_id': genre['id'],
+                     'genre_name': genre['name']}
+    url = build_url(__append_dicts(params, args))
     list_item = xbmcgui.ListItem(genre['name'])
+    xbmcplugin.addDirectoryItem(ADDON_HANDLE, url, list_item, True)
+
+  args = {'action': 'discover', 'genre_all': 'genre_all'}
+  url = build_url(__append_dicts(params, args))
+  list_item = xbmcgui.ListItem('ALL')
+  xbmcplugin.addDirectoryItem(ADDON_HANDLE, url, list_item, True)
+
+  xbmcplugin.endOfDirectory(ADDON_HANDLE)
+
+
+def list_periods(params):
+  periods = {
+    '2025': {'date_gte': '2025-01-01', 'date_lte': '2025-12-31'},
+    '2024': {'date_gte': '2024-01-01', 'date_lte': '2024-12-31'},
+    '2023': {'date_gte': '2023-01-01', 'date_lte': '2023-12-31'},
+    '2022': {'date_gte': '2022-01-01', 'date_lte': '2022-12-31'},
+    '2021': {'date_gte': '2021-01-01', 'date_lte': '2021-12-31'},
+    '2020': {'date_gte': '2020-01-01', 'date_lte': '2020-12-31'},
+    '2020s': {'date_gte': '2020-01-01'},
+    '2010s': {'date_gte': '2010-01-01', 'date_lte': '2019-12-31'},
+    '2000s': {'date_gte': '2000-01-01', 'date_lte': '2009-12-31'},
+    '1990s': {'date_gte': '1990-01-01', 'date_lte': '1999-12-31'},
+    '1980s': {'date_gte': '1980-01-01', 'date_lte': '1989-12-31'},
+    '1970s': {'date_gte': '1970-01-01', 'date_lte': '1979-12-31'},
+    'pre-1970s': {'date_lte': '1969-12-31'},
+    'ALL': {'date_all': 'date_all'},
+  }
+
+  for period, bounds in periods.items():
+    args = {'action': 'discover'}
+    bounds.update(params)
+    bounds.update(args)
+    url = build_url(bounds)
+    list_item = xbmcgui.ListItem(period)
     xbmcplugin.addDirectoryItem(ADDON_HANDLE, url, list_item, True)
 
   xbmcplugin.endOfDirectory(ADDON_HANDLE)
 
 
-def list_movies_by_genre(genre_id, genre_name, page):
-  url = f"{BASE_URL}/discover/movie?api_key={API_KEY}&with_genres={genre_id}&page={page}"
+# def list_movies_by_genre(genre_id, genre_name, page):
+#   url = f"{BASE_URL}/discover/movie?api_key={API_KEY}&with_genres={genre_id}&page={page}"
+#   data = get_json(url)
+#
+#   __previous_pages(page, {
+#     'action': 'movies_by_genre',
+#     'genre_id': genre_id,
+#     'genre_name': genre_name
+#   })
+#
+#   for movie in data['results']:
+#     __list_movie(movie)
+#
+#   __next_pages(page, data['total_pages'], {
+#     'action': 'movies_by_genre',
+#     'genre_id': genre_id,
+#     'genre_name': genre_name
+#   })
+#
+#   xbmcplugin.endOfDirectory(ADDON_HANDLE)
+
+
+def discover(params, page):
+  if 'genre_id' not in params and 'genre_all' not in params:
+    list_genres(params)
+    return
+
+  if 'date_gte' not in params and 'date_lte' not in params and 'date_all' not in params:
+    list_periods(params)
+    return
+
+  request = {'api_key': API_KEY}
+
+  if 'genre_all' not in params:
+    if 'genre_id' in params:
+      request['with_genres'] = params['genre_id']
+
+  if 'date_all' not in params:
+    if 'date_gte' in params:
+      request['primary_release_date.gte'] = params['date_gte']
+    if 'date_lte' in params:
+      request['primary_release_date.lte'] = params['date_lte']
+
+  request['sort_by'] = 'popularity.desc'
+
+  url = build_url(__append_dicts({'page': page}, request), f"{BASE_URL}/discover/movie")
+  xbmc.log(f"Discover URL {url}", level=xbmc.LOGINFO)
+
   data = get_json(url)
 
-  __previous_pages(page, {
-    'action': 'movies_by_genre',
-    'genre_id': genre_id,
-    'genre_name': genre_name
-  })
+  __previous_pages(page, params)
 
   for movie in data['results']:
     __list_movie(movie)
 
-  __next_pages(page, data['total_pages'], {
-    'action': 'movies_by_genre',
-    'genre_id': genre_id,
-    'genre_name': genre_name
-  })
+  __next_pages(page, data['total_pages'], params)
 
   xbmcplugin.endOfDirectory(ADDON_HANDLE)
 
@@ -129,12 +209,20 @@ def play_movie(movie_id):
   xbmc.log(f"Resolving {movie_id}", level=xbmc.LOGINFO)
 
   playback_url = None
+  subtitles = None
   error_message = None
   try:
     # playback_url = vidsrc.resolve(movie_id)
+    # result = requests.get(f"http://localhost:8080/fetch?movieid={movie_id}")
     result = requests.get(f"http://192.168.0.145:8080/fetch?movieid={movie_id}")
     data = json.loads(result.text)
-    playback_url = data['playlist'] if data['playlist'] else None
+    xbmc.log(f"Got response {result.text}", level=xbmc.LOGINFO)
+    error_message = data['error'] if 'error' in data else None
+
+    if not error_message:
+      playback_url = data['playlist'] if 'playlist' in data else None
+      xbmc.log(f"Got playback url {playback_url}", level=xbmc.LOGINFO)
+      subtitles = data['subtitles'] if 'subtitles' in data else None
   except Exception as e:
     error_message = f"- {e}"
 
@@ -150,6 +238,39 @@ def play_movie(movie_id):
   list_item = xbmcgui.ListItem(path=playback_url)
   xbmcplugin.setResolvedUrl(handle=ADDON_HANDLE, succeeded=True,
                             listitem=list_item)
+
+  if subtitles:
+    player = xbmc.Player()
+    player.play(playback_url, list_item)
+
+    engsub = __determine_english_sub(subtitles)
+    while not player.isPlaying():
+      xbmc.sleep(100)
+
+    if engsub:
+      xbmc.log(f"Found engsub {engsub}", level=xbmc.LOGINFO)
+      player.setSubtitles(engsub)
+      return
+
+    # no choice - display all
+    xbmc.log(f"Adding all {len(subtitles)} subs", level=xbmc.LOGINFO)
+    for subtitle_url in subtitles:
+      player.setSubtitles(subtitle_url)
+
+
+def __determine_english_sub(subtitle_urls):
+  # quick
+  for subtitle_url in subtitle_urls:
+    if re.search(r"/en-?[^/]+$", subtitle_url):
+      return subtitle_url
+
+  # slow
+  for subtitle_url in subtitle_urls:
+    subtitle_content = requests.get(subtitle_url)
+    # look for common english words
+    if re.search(' you ', subtitle_content.text) or re.search(' yes ', subtitle_content.text) or re.search(' cannot ', subtitle_content.text) or re.search(' know ', subtitle_content.text):
+      return subtitle_url
+  return None
 
 
 def __list_movie(movie):
@@ -184,16 +305,19 @@ def __list_movie(movie):
 
 
 def __normalize_score(popularity, max_popularity, reviews, review_score):
-  # popularity decreases in importance is it increases
-  pop_factor = math.log(popularity + 50, 10) / math.log(max_popularity + 1, 10)
-  # review factor increases drastically as reviews increase
-  review_transition_score = 1.2
-  review_factor = reviews * review_transition_score / 10
-  if reviews > 10:
-    review_factor = review_transition_score + ((reviews - 10) * 0.9 / 89)
-
   # bound to 0-10
-  return round(max(0, min(review_score * pop_factor * review_factor, 10)), 2)
+  # return round(max(0, min(review_score * pop_factor * review_factor, 10)), 2)
+  max_reviews = 400
+  review_factor = min(1, math.log(reviews + 105) / math.log(max_reviews + 1))
+
+  print(review_factor)
+  # popularity does not affect a highly reviewed show
+  popularity_factor = 1
+  if review_factor < 0.8:
+    popularity_factor = math.log(popularity + 1) / math.log(max_popularity + 1)
+
+  # Final score calculation
+  return round(max(0, min(review_score * review_factor * popularity_factor, 10)), 2)
 
 
 def on_action(action, control_id):
@@ -254,18 +378,23 @@ params = parse_qs(sys.argv[2][1:])
 action = params.get('action', [None])[0]
 page = int(params.get('page', [1])[0])
 
-xbmc.log(f"Action: {action}", level=xbmc.LOGINFO)
+request_params = {}
+for k, v in params.items():
+  request_params[k] = v[0]
+
+# xbmc.log(f"Action: {action}", level=xbmc.LOGINFO)
+# xbmc.log(f"Params: {request_params}", level=xbmc.LOGINFO)
 
 if action is None:
   main_menu()
 elif action == 'trending':
   list_trending(page)
 elif action == 'genres':
-  list_genres()
-elif action == 'movies_by_genre':
-  genre_id = params['genre_id'][0]
-  genre_name = params['genre_name'][0]
-  list_movies_by_genre(genre_id, genre_name, page)
+  list_genres(request_params)
+elif action == 'periods':
+  list_periods(request_params)
+elif action == 'discover':
+  discover(request_params, page)
 elif action == 'find':
   find_movies()
 elif action == 'search':
