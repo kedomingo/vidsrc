@@ -1,15 +1,15 @@
+import json
 import math
-import re
 import sys
+from urllib.parse import parse_qs
+from urllib.parse import quote
+from urllib.parse import urlencode
+from ext.extensions import MyPlayer
+from ext.extensions import PlaybackMonitor
+import requests
 import xbmc
 import xbmcgui
 import xbmcplugin
-import requests
-from urllib.parse import parse_qs
-from urllib.parse import urlencode
-from urllib.parse import quote
-from resolver import vidsrc
-import json
 
 BASE_URL = "https://api.themoviedb.org/3"
 THUMB_BASE_URL = "https://image.tmdb.org/t/p/w185"
@@ -17,6 +17,7 @@ IMAGE_BASE_URL = "https://image.tmdb.org/t/p/w500"
 API_KEY = "d75677fb857aa6f339c67d9ba89f9aed"  # DO NOT COMMIT
 
 ADDON_HANDLE = int(sys.argv[1])
+SERVER_ADDRESS = 'http://192.168.0.145:8080'
 
 
 def show_notification(title, message):
@@ -40,7 +41,8 @@ def main_menu():
 
   # Add Trending option
   url = build_url({'action': 'trending', 'page': 1})
-  xbmcplugin.addDirectoryItem(ADDON_HANDLE, url, xbmcgui.ListItem('Trending Movies'),
+  xbmcplugin.addDirectoryItem(ADDON_HANDLE, url,
+                              xbmcgui.ListItem('Trending Movies'),
                               True)
 
   # Add Genre option
@@ -80,7 +82,7 @@ def list_genres(params=None):
 
   for genre in data['genres']:
     args = {'action': 'discover', 'genre_id': genre['id'],
-                     'genre_name': genre['name']}
+            'genre_name': genre['name']}
     url = build_url(__append_dicts(params, args))
     list_item = xbmcgui.ListItem(genre['name'])
     xbmcplugin.addDirectoryItem(ADDON_HANDLE, url, list_item, True)
@@ -122,28 +124,6 @@ def list_periods(params):
   xbmcplugin.endOfDirectory(ADDON_HANDLE)
 
 
-# def list_movies_by_genre(genre_id, genre_name, page):
-#   url = f"{BASE_URL}/discover/movie?api_key={API_KEY}&with_genres={genre_id}&page={page}"
-#   data = get_json(url)
-#
-#   __previous_pages(page, {
-#     'action': 'movies_by_genre',
-#     'genre_id': genre_id,
-#     'genre_name': genre_name
-#   })
-#
-#   for movie in data['results']:
-#     __list_movie(movie)
-#
-#   __next_pages(page, data['total_pages'], {
-#     'action': 'movies_by_genre',
-#     'genre_id': genre_id,
-#     'genre_name': genre_name
-#   })
-#
-#   xbmcplugin.endOfDirectory(ADDON_HANDLE)
-
-
 def discover(params, page):
   if 'genre_id' not in params and 'genre_all' not in params:
     list_genres(params)
@@ -167,7 +147,8 @@ def discover(params, page):
 
   request['sort_by'] = 'popularity.desc'
 
-  url = build_url(__append_dicts({'page': page}, request), f"{BASE_URL}/discover/movie")
+  url = build_url(__append_dicts({'page': page}, request),
+                  f"{BASE_URL}/discover/movie")
   xbmc.log(f"Discover URL {url}", level=xbmc.LOGINFO)
 
   data = get_json(url)
@@ -205,16 +186,18 @@ def search_movies(query, page):
   xbmcplugin.endOfDirectory(ADDON_HANDLE)
 
 
-def play_movie(movie_id):
-  xbmc.log(f"Resolving {movie_id}", level=xbmc.LOGINFO)
+def play_movie(tmdb_id, tries=0):
+  xbmc.log(f"Resolving {tmdb_id}", level=xbmc.LOGINFO)
 
   playback_url = None
   subtitles = None
   error_message = None
   try:
-    # playback_url = vidsrc.resolve(movie_id)
-    # result = requests.get(f"http://localhost:8080/fetch?movieid={movie_id}")
-    result = requests.get(f"http://192.168.0.145:8080/fetch?movieid={movie_id}")
+    server_url = f"{SERVER_ADDRESS}/fetch?movieid={tmdb_id}"
+    if tries > 0:
+      server_url += '&nocache=1'
+
+    result = requests.get(server_url)
     data = json.loads(result.text)
     xbmc.log(f"Got response {result.text}", level=xbmc.LOGINFO)
     error_message = data['error'] if 'error' in data else None
@@ -228,8 +211,8 @@ def play_movie(movie_id):
 
   if playback_url is None:
     show_notification("Error",
-                      f"Could not resolve movie {movie_id} {error_message}")
-    xbmc.log(f"Could not resolve movie {movie_id}", level=xbmc.LOGINFO)
+                      f"Could not resolve movie {tmdb_id} {error_message}")
+    xbmc.log(f"Could not resolve movie {tmdb_id}", level=xbmc.LOGINFO)
     return
 
   xbmc.log(f"Playing vidsrc {playback_url}", level=xbmc.LOGINFO)
@@ -239,10 +222,18 @@ def play_movie(movie_id):
   xbmcplugin.setResolvedUrl(handle=ADDON_HANDLE, succeeded=True,
                             listitem=list_item)
 
-  if subtitles:
-    player = xbmc.Player()
-    player.play(playback_url, list_item)
+  player = MyPlayer()
+  player.play(playback_url, list_item)
+  monitor = PlaybackMonitor()
 
+  set_subtitles(subtitles, player)
+  # Retry once on failure
+  if tries == 0:
+    handle_retry_on_failure(tries, player, monitor)
+
+
+def set_subtitles(subtitles, player: xbmc.Player):
+  if subtitles:
     while not player.isPlaying():
       xbmc.sleep(100)
 
@@ -260,19 +251,16 @@ def play_movie(movie_id):
       player.setSubtitles(subtitle_url)
 
 
-# def __determine_english_sub(subtitle_urls):
-#   # quick
-#   for subtitle_url in subtitle_urls:
-#     if re.search(r"/en-?[^/]+$", subtitle_url):
-#       return subtitle_url
-#
-#   # slow
-#   for subtitle_url in subtitle_urls:
-#     subtitle_content = requests.get(subtitle_url)
-#     # look for common english words
-#     if re.search(' you ', subtitle_content.text) or re.search(' yes ', subtitle_content.text) or re.search(' cannot ', subtitle_content.text) or re.search(' know ', subtitle_content.text):
-#       return subtitle_url
-#   return None
+def handle_retry_on_failure(tries, player: xbmc.Player, monitor: xbmc.Monitor):
+  while not monitor.abortRequested():
+    if monitor.waitForAbort(1):
+      break
+    if player.isPlaying():
+      xbmc.log("Item is playing!", xbmc.LOGINFO)
+      break
+
+  if player.playback_failed or monitor.playback_failed:
+    play_movie(movie_id, tries=tries + 1)
 
 
 def __list_movie(movie):
@@ -319,7 +307,8 @@ def __normalize_score(popularity, max_popularity, reviews, review_score):
     popularity_factor = math.log(popularity + 1) / math.log(max_popularity + 1)
 
   # Final score calculation
-  return round(max(0, min(review_score * review_factor * popularity_factor, 10)), 2)
+  return round(
+      max(0, min(review_score * review_factor * popularity_factor, 10)), 2)
 
 
 def on_action(action, control_id):
