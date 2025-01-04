@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<addon id="repository.kedomingo" name="kedomingo" version="0.12" provider-name="kedomingo">
+<addon id="repository.kedomingo" name="kedomingo" version="0.13" provider-name="kedomingo">
   <extension point="xbmc.addon.repository" name="kedomingo">
     <dir>
       <info compressed="false">https://raw.githubusercontent.com/kedomingo/vidsrc/refs/heads/main/zips/addons.xml</info>
