@@ -27,7 +27,13 @@ def show_notification(title, message):
 
 def build_url(query, base=None):
   base = base if base else sys.argv[0]
-  return f"{base}?{urlencode(query)}"
+  prepared_query = {}
+  for k, v in query.items():
+    if isinstance(v, dict):
+      prepared_query[k] = json.dumps(v)
+    else:
+      prepared_query[k] = v
+  return f"{base}?{urlencode(prepared_query)}"
 
 
 def get_json(url):
@@ -186,16 +192,49 @@ def search_movies(query, page):
   xbmcplugin.endOfDirectory(ADDON_HANDLE)
 
 
-def play_movie(tmdb_id, tries=0):
+def select_movie(params):
+  window = xbmcgui.Window(10000)
+  window.setProperty('title', 'Select stream provider')
+  streamers = [
+    'vidsrc',
+    'autoembed',
+    'vidlink',
+    'vidsrcicu',
+    'cineby', # redirecting to about:blank frequently
+  ]
+  art = json.loads(params['art'])
+  infoLabels = json.loads(params['infoLabels'])
+  for streamer in streamers:
+    url = build_url(
+        __append_dicts(params, {'action': 'play_movie', 'resolver': streamer}))
+    list_item = xbmcgui.ListItem(streamer)
+
+    list_item.setArt(art)
+    list_item.setInfo(type="video", infoLabels=infoLabels)
+    list_item.setProperty("IsPlayable", 'True')
+
+    xbmcplugin.addDirectoryItem(ADDON_HANDLE, url, list_item, isFolder=False)
+
+  xbmcplugin.endOfDirectory(ADDON_HANDLE)
+
+
+def play_movie(params, tries=0):
+  tmdb_id = params['tmdb_id']
+  resolver = params['resolver'] if 'resolver' in params else None
   xbmc.log(f"Resolving {tmdb_id}", level=xbmc.LOGINFO)
 
   playback_url = None
   subtitles = None
   error_message = None
   try:
+    message = f'Resolving tmdb_id'
     server_url = f"{SERVER_ADDRESS}/fetch?movieid={tmdb_id}"
+    if resolver:
+      message += f' via {resolver}'
+      server_url += f'&resolver={resolver}'
     if tries > 0:
       server_url += '&nocache=1'
+    show_notification('Info', message)
 
     result = requests.get(server_url)
     data = json.loads(result.text)
@@ -203,6 +242,7 @@ def play_movie(tmdb_id, tries=0):
     error_message = data['error'] if 'error' in data else None
 
     if not error_message:
+      show_notification('Success', 'rendering')
       playback_url = data['playlist'] if 'playlist' in data else None
       xbmc.log(f"Got playback url {playback_url}", level=xbmc.LOGINFO)
       subtitles = data['subtitles'] if 'subtitles' in data else None
@@ -269,29 +309,31 @@ def __list_movie(movie):
   normalized_rating = __normalize_score(movie['popularity'], 1500,
                                         movie['vote_count'],
                                         movie['vote_average'])
-  plot = f"{movie['overview']}\n\nRating: {rating}\nNormalized Rating: {normalized_rating}"
+  plot = f"{title}\n\n{movie['overview']}\n\nRating: {rating}\nNormalized Rating: {normalized_rating}"
   backdrop = movie['backdrop_path'] if 'backdrop_path' in movie and movie[
     'backdrop_path'] else ''
   poster = movie['poster_path'] if 'poster_path' in movie and movie[
     'poster_path'] else ''
 
-  list_item = xbmcgui.ListItem(title)
-  list_item.setArt(
-      {
-        'poster': IMAGE_BASE_URL + (poster if poster else backdrop),
-        'banner': IMAGE_BASE_URL + (backdrop if backdrop else poster),
-        'thumb': THUMB_BASE_URL + (poster if poster else backdrop),
-        'icon': THUMB_BASE_URL + (poster if poster else backdrop)
-      }
-  )
-  list_item.setInfo(type="video", infoLabels={
+  art = {
+    'poster': IMAGE_BASE_URL + (poster if poster else backdrop),
+    'fanart': IMAGE_BASE_URL + (backdrop if backdrop else poster),
+    'banner': IMAGE_BASE_URL + (backdrop if backdrop else poster),
+    'thumb': IMAGE_BASE_URL + (poster if poster else backdrop),
+    'icon': IMAGE_BASE_URL + (poster if poster else backdrop)
+  }
+  infoLabels = {
     'title': title,
     'plot': plot,
     'Rating': str(normalized_rating)
-  })
-  list_item.setProperty("IsPlayable", 'True')
-  url = build_url({'action': 'play_movie', 'id': movie['id']})
-  xbmcplugin.addDirectoryItem(ADDON_HANDLE, url, list_item, False)
+  }
+  list_item = xbmcgui.ListItem(title)
+  list_item.setArt(art)
+  list_item.setInfo(type="video", infoLabels=infoLabels)
+  list_item.setProperty("IsPlayable", 'False')
+  url = build_url({'action': 'select_movie', 'tmdb_id': movie['id'], 'art': art,
+                   'infoLabels': infoLabels})
+  xbmcplugin.addDirectoryItem(ADDON_HANDLE, url, list_item, isFolder=True)
 
 
 def __normalize_score(popularity, max_popularity, reviews, review_score):
@@ -373,7 +415,7 @@ request_params = {}
 for k, v in params.items():
   request_params[k] = v[0]
 
-# xbmc.log(f"Action: {action}", level=xbmc.LOGINFO)
+xbmc.log(f"Action: {action}", level=xbmc.LOGINFO)
 # xbmc.log(f"Params: {request_params}", level=xbmc.LOGINFO)
 
 if action is None:
@@ -391,7 +433,7 @@ elif action == 'find':
 elif action == 'search':
   query = params['query'][0]
   search_movies(query, page)
+elif action == 'select_movie':
+  select_movie(request_params)
 elif action == 'play_movie':
-  movie_id = params['id'][0]
-  xbmc.log(f"Movie ID: {movie_id}", level=xbmc.LOGINFO)
-  play_movie(movie_id)
+  play_movie(request_params)

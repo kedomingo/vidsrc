@@ -3,3 +3,4 @@ venv
 src/plugins/script.*
 tmp
 /repository.kedomingo-*.zip
+__pycache__
