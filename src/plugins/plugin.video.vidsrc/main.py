@@ -1,21 +1,17 @@
 import json
-import math
 import sys
+from urllib.parse import parse_qs
+
 import xbmc
 import xbmcgui
 import xbmcplugin
-from urllib.parse import parse_qs
 
 from client.firestreamarr_client import FirestreamarrClient
 from client.tmdb_client import TmdbClient
-from ext.extensions import MyPlayer
-from ext.extensions import PlaybackMonitor
-from model.season import Show
 from resolver.player import Player
-from util.cache import get_cached, cache_response
 from util.lister import Lister
 from util.pagination import previous_pages, next_pages
-from util.util import log, show_notification, append_dicts, build_url
+from util.util import log, append_dicts, build_url
 
 ADDON_HANDLE = int(sys.argv[1])
 ADDON_BASE_URL = sys.argv[0]
@@ -205,14 +201,8 @@ def select_tv(params):
   if 'type' not in params:
     params['type'] = 'tv'
 
-  cached = get_cached(cachekey=params['tmdb_id'], cachegroup='seasons')
-  if cached:
-    log(f"seasons::{params['tmdb_id']} cache hit")
-    data = cached
-  else:
-    log(f"seasons::{params['tmdb_id']} cache miss")
-    data = client.show_details(params['type'], params['tmdb_id'])
-    cache_response(params['tmdb_id'], data, cachegroup='seasons')
+
+  data = client.show_details(params['type'], params['tmdb_id'])
 
   # TODO
   # if data['number_of_seasons'] == 1:

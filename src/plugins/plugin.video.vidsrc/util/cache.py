@@ -8,31 +8,31 @@ from pathlib import Path
 from util.util import log
 
 
-def get_cached(cachekey, cachegroup=None, disregard_date=False):
-  cachegroup = cachegroup if cachegroup is not None else str(cachekey)[0]
-  file_path = get_cache_path(cachekey, cachegroup)
+def get_cached(cache_key, cache_group=None, not_older_than_days=-1):
+  cache_group = cache_group if cache_group is not None else str(cache_key)[0]
+  file_path = get_cache_path(cache_key, cache_group)
   if not os.path.isfile(file_path):
     return None
 
   with open(file_path, 'r') as file:
     data = json.load(file)
 
-  if disregard_date:
+  if not_older_than_days < 0:
     return data['body']
 
   year, month, day = map(int, data['cached'].split("-"))
   cached_on = datetime(year, month, day).date()
   today = datetime.today().date()
   days_elapsed = (today - cached_on).days
-  if days_elapsed <= 2:
+  if days_elapsed <= not_older_than_days:
     return data['body']
 
   return None
 
 
-def cache_response(cachekey, response, cachegroup=None):
-  cachegroup = cachegroup if cachegroup is not None else str(cachekey)[0]
-  file_path = get_cache_path(cachekey, cachegroup)
+def cache_response(cache_key, response, cache_group=None):
+  cache_group = cache_group if cache_group is not None else str(cache_key)[0]
+  file_path = get_cache_path(cache_key, cache_group)
 
   directory = os.path.dirname(file_path)
   if not os.path.exists(directory):

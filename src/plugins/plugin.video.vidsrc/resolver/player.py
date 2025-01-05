@@ -32,7 +32,7 @@ class Player:
         'tv_id': tmdb_id,
       }
       message += f" ep. {params['episode_number']}"
-      seasondata = get_cached(cachekey=params['tmdb_id'], cachegroup='seasons')
+      seasondata = get_cached(cache_key=params['tmdb_id'], cache_group='show_details')
       show = Show.from_dict(seasondata)
       # back and next buttons
       back_season, back_ep = show.get_back_button_episode(params['season_number'], params['episode_number'])
