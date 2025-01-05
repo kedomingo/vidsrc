@@ -1,10 +1,10 @@
 import json
 import os
 import shutil
-import tempfile
 from datetime import datetime
 from pathlib import Path
 
+import xbmcvfs
 from util.util import log
 
 
@@ -53,7 +53,9 @@ def get_cache_path(cachekey, cachegroup):
 
 
 def get_cache_dir():
-  return f"{tempfile.gettempdir()}/cache"
+  tempdir = xbmcvfs.translatePath("special://temp/")
+  tempdir = str(tempdir).rstrip('/')
+  return f"{tempdir}/cache"
 
 
 def cleanup():

@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <addons>
 
-  <addon id="plugin.video.vidsrc" name="vidsrc" version="1.50" provider-name="kedomingo">
+  <addon id="plugin.video.vidsrc" name="vidsrc" version="1.51" provider-name="kedomingo">
     <requires>
       <import addon="xbmc.python" version="3.0.0"/>
       <import addon="script.module.requests" version="2.31.0"/>
