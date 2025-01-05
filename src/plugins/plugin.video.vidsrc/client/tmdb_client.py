@@ -110,15 +110,16 @@ class TmdbClient:
     """
     get season details + episodes
     """
-    cached = get_cached(cache_key=tmdb_id, cache_group='season_details')
+    cachekey = f'{tmdb_id}.{season_number}'
+    cached = get_cached(cache_key=cachekey, cache_group='season_details')
     if cached:
-      log(f"season_details::{tmdb_id} cache hit")
+      log(f"season_details::{cachekey} cache hit")
       return cached
 
-    log(f"season_details::{tmdb_id} cache miss")
+    log(f"season_details::{cachekey} cache miss")
     url = f"{BASE_URL}/tv/{tmdb_id}/season/{season_number}?api_key={self.api_key}"
     data = self.__get(url)
-    cache_response(tmdb_id, data, cache_group='season_details')
+    cache_response(cachekey, data, cache_group='season_details')
 
     return data
 
