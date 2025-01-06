@@ -1,3 +1,4 @@
+import hashlib
 import json
 import sys
 from urllib.parse import parse_qs
@@ -12,6 +13,7 @@ from resolver.player import Player
 from util.lister import Lister
 from util.pagination import previous_pages, next_pages
 from util.util import log, append_dicts, build_url
+from util.cache import cache_get
 
 ADDON_HANDLE = int(sys.argv[1])
 ADDON_BASE_URL = sys.argv[0]
@@ -20,7 +22,6 @@ API_KEY = "d75677fb857aa6f339c67d9ba89f9aed"  # DO NOT COMMIT
 
 client = TmdbClient(API_KEY)
 fs_client = FirestreamarrClient()
-player = Player(ADDON_HANDLE, ADDON_BASE_URL, fs_client)
 
 li = Lister(ADDON_HANDLE, ADDON_BASE_URL)
 
@@ -201,7 +202,6 @@ def select_tv(params):
   if 'type' not in params:
     params['type'] = 'tv'
 
-
   data = client.show_details(params['type'], params['tmdb_id'])
 
   # TODO
@@ -274,7 +274,51 @@ def select_movie(params):
 
 
 def play_movie(params):
+  if 'episode_number' in params:
+    media_id = f"{params['tmdb_id']}.{params['season_number']}.{params['episode_number']}"
+    params['type'] = 'tv'
+  else:
+    media_id = params['tmdb_id']
+    params['type'] = 'movie'
+
+  last_position_cache_key = f"{params['type']}-{media_id}-{params['resolver']}"
+  last_position_seconds = cache_get(
+      last_position_cache_key,
+      'last-position',
+      not_older_than_days=30
+  )
+
+  player = None
+  if last_position_seconds:
+    dialog = xbmcgui.Dialog()
+    result = dialog.yesno(
+        'Resume playback?',
+        f'Do you want to resume playback from {__format_time(last_position_seconds)}?'
+    )
+
+    if result == 1:
+      log('User clicked Yes')
+      player = Player(
+          ADDON_HANDLE,
+          ADDON_BASE_URL,
+          fs_client,
+          play_from_seconds=last_position_seconds
+      )
+
+  if player is None:
+    player = Player(ADDON_HANDLE, ADDON_BASE_URL, fs_client)
+
   player.play_movie(params)
+
+
+def __format_time(seconds):
+  minutes, seconds = divmod(seconds, 60)
+  hours, minutes = divmod(minutes, 60)
+
+  if hours > 0:
+    return f"{int(hours):02}:{int(minutes):02}:{int(seconds):02}"
+  else:
+    return f"{int(minutes):02}:{int(seconds):02}"
 
 
 ## -----------------------------------

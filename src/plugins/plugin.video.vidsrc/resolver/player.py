@@ -1,7 +1,6 @@
 import xbmc
 import xbmcgui
 import xbmcplugin
-
 from ext.extensions import MyPlayer, PlaybackMonitor
 from model.season import Show
 from util.cache import cache_get, cache_put
@@ -9,10 +8,12 @@ from util.util import log, show_notification, build_url, append_dicts
 
 
 class Player:
-  def __init__(self, addon_handle, addon_base_url, fs_client):
+  def __init__(self, addon_handle, addon_base_url, fs_client,
+      play_from_seconds=None):
     self.__addon_handle = addon_handle
     self.__addon_base_url = addon_base_url
     self.__fs_client = fs_client
+    self.__play_from_seconds = play_from_seconds
 
 
   def play_movie(self, params, tries=0):
@@ -26,10 +27,7 @@ class Player:
 
     message = f'{tries + 1}: Resolving {tmdb_id}'
     back_url = next_url = None
-    media_type = media_id = None
     if 'episode_number' in params:
-      media_type = 'tv'
-      media_id = f"{tmdb_id}.{params['season_number']}.{params['episode_number']}"
       request_params = {
         'episode_number': params['episode_number'],
         'season_number': params['season_number'],
@@ -70,8 +68,6 @@ class Player:
         )
 
     else:
-      media_type = 'movie'
-      media_id = tmdb_id
       request_params = {'movieid': tmdb_id, }
 
     if resolver:
@@ -110,9 +106,10 @@ class Player:
         succeeded=True,
     )
 
+    ####################
+
     player = MyPlayer(
-        media_type,
-        media_id,
+        play_from_seconds=self.__play_from_seconds,
         previous_media_url=back_url,
         next_media_url=next_url
     )
@@ -134,8 +131,14 @@ class Player:
 
     # I cannot put this on the player subclass itself. it doesn't work
     # anymore after playback stopped and there is a callback exception emitted
+    if 'episode_number' in params:
+      media_id = f"{params['tmdb_id']}.{params['season_number']}.{params['episode_number']}"
+    else:
+      media_id = params['tmdb_id']
+    last_position_cache_key = f"{params['type']}-{media_id}-{params['resolver']}"
+
     cache_put(
-        f'{media_type}-{media_id}',
+        last_position_cache_key,
         current_time,
         'last-position'
     )
