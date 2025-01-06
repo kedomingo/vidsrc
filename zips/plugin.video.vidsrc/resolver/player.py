@@ -26,7 +26,6 @@ class Player:
     error_message = None
 
     message = f'{tries + 1}: Resolving {tmdb_id}'
-    back_url = next_url = None
     if 'episode_number' in params:
       request_params = {
         'episode_number': params['episode_number'],
@@ -34,38 +33,6 @@ class Player:
         'tv_id': tmdb_id,
       }
       message += f" ep. {params['episode_number']}"
-      seasondata = cache_get(cache_key=params['tmdb_id'],
-                             cache_group='show_details')
-      show = Show.from_dict(seasondata)
-      # back and next buttons
-      back_season, back_ep = show.get_back_button_episode(
-          params['season_number'], params['episode_number'])
-      next_season, next_ep = show.get_next_button_episode(
-          params['season_number'], params['episode_number'])
-
-      if back_season is not None and back_ep is not None:
-        back_url = build_url(
-            append_dicts(
-                params,
-                {
-                  'season_number': back_season,
-                  'episode_number': back_ep
-                }
-            ),
-            self.__addon_base_url
-        )
-
-      if next_season is not None and next_ep is not None:
-        next_url = build_url(
-            append_dicts(
-                params,
-                {
-                  'season_number': next_season,
-                  'episode_number': next_ep
-                }
-            ),
-            self.__addon_base_url
-        )
 
     else:
       request_params = {'movieid': tmdb_id, }
@@ -91,10 +58,16 @@ class Player:
       error_message = f"- {e}"
 
     if playback_url is None:
-      show_notification("Error",
-                        f"Could not resolve movie {tmdb_id} {error_message}")
+      show_notification(
+          "Error",
+          f"Could not resolve movie {tmdb_id} {error_message}"
+      )
       log(f"Could not resolve movie {tmdb_id}")
       return
+
+    ####################
+    # Resolved successfully
+    ####################
 
     log(f"Playing {playback_url}")
 
@@ -107,7 +80,10 @@ class Player:
     )
 
     ####################
+    # Extra stuff while playing
+    ####################
 
+    back_url, next_url = self.nav_button_urls(params)
     player = MyPlayer(
         play_from_seconds=self.__play_from_seconds,
         previous_media_url=back_url,
@@ -142,6 +118,48 @@ class Player:
         current_time,
         'last-position'
     )
+
+
+  def nav_button_urls(self, params):
+    cache_key = f"{params['type']}.{params['tmdb_id']}"
+    show_data = cache_get(cache_key=cache_key, cache_group='show_details')
+    if not show_data:
+      log(f"Something weird. no show data for {params['tmdb_id']}")
+      return None, None
+
+    show = Show.from_dict(show_data)
+    # back and next buttons
+    back_season, back_ep = show.get_back_button_episode(
+        params['season_number'], params['episode_number'])
+    next_season, next_ep = show.get_next_button_episode(
+        params['season_number'], params['episode_number'])
+
+    back_url = next_url = None
+    if back_season is not None and back_ep is not None:
+      back_url = build_url(
+          append_dicts(
+              params,
+              {
+                'season_number': back_season,
+                'episode_number': back_ep
+              }
+          ),
+          self.__addon_base_url
+      )
+
+    if next_season is not None and next_ep is not None:
+      next_url = build_url(
+          append_dicts(
+              params,
+              {
+                'season_number': next_season,
+                'episode_number': next_ep
+              }
+          ),
+          self.__addon_base_url
+      )
+
+    return back_url, next_url
 
 
   def set_subtitles(self, subtitles, player: xbmc.Player):
