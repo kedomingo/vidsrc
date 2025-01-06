@@ -4,7 +4,7 @@ import xbmcplugin
 
 from ext.extensions import MyPlayer, PlaybackMonitor
 from model.season import Show
-from util.cache import get_cached
+from util.cache import cache_get, cache_put
 from util.util import log, show_notification, build_url, append_dicts
 
 
@@ -13,6 +13,7 @@ class Player:
     self.__addon_handle = addon_handle
     self.__addon_base_url = addon_base_url
     self.__fs_client = fs_client
+
 
   def play_movie(self, params, tries=0):
     tmdb_id = params['tmdb_id']
@@ -25,18 +26,24 @@ class Player:
 
     message = f'{tries + 1}: Resolving {tmdb_id}'
     back_url = next_url = None
+    media_type = media_id = None
     if 'episode_number' in params:
+      media_type = 'tv'
+      media_id = f"{tmdb_id}.{params['season_number']}.{params['episode_number']}"
       request_params = {
         'episode_number': params['episode_number'],
         'season_number': params['season_number'],
         'tv_id': tmdb_id,
       }
       message += f" ep. {params['episode_number']}"
-      seasondata = get_cached(cache_key=params['tmdb_id'], cache_group='show_details')
+      seasondata = cache_get(cache_key=params['tmdb_id'],
+                             cache_group='show_details')
       show = Show.from_dict(seasondata)
       # back and next buttons
-      back_season, back_ep = show.get_back_button_episode(params['season_number'], params['episode_number'])
-      next_season, next_ep = show.get_next_button_episode(params['season_number'], params['episode_number'])
+      back_season, back_ep = show.get_back_button_episode(
+          params['season_number'], params['episode_number'])
+      next_season, next_ep = show.get_next_button_episode(
+          params['season_number'], params['episode_number'])
 
       if back_season is not None and back_ep is not None:
         back_url = build_url(
@@ -63,6 +70,8 @@ class Player:
         )
 
     else:
+      media_type = 'movie'
+      media_id = tmdb_id
       request_params = {'movieid': tmdb_id, }
 
     if resolver:
@@ -101,7 +110,12 @@ class Player:
         succeeded=True,
     )
 
-    player = MyPlayer(previous_media_url=back_url, next_media_url=next_url)
+    player = MyPlayer(
+        media_type,
+        media_id,
+        previous_media_url=back_url,
+        next_media_url=next_url
+    )
     player.play(playback_url, list_item)
     monitor = PlaybackMonitor()
 
@@ -109,6 +123,23 @@ class Player:
     # Retry once on failure
     if tries == 0:
       self.handle_retry_on_failure(tmdb_id, tries, player, monitor)
+
+    current_time = None
+    try:
+      while not monitor.abortRequested():
+        current_time = player.getTime()
+        xbmc.sleep(1)
+    except:
+      pass
+
+    # I cannot put this on the player subclass itself. it doesn't work
+    # anymore after playback stopped and there is a callback exception emitted
+    cache_put(
+        f'{media_type}-{media_id}',
+        current_time,
+        'last-position'
+    )
+
 
   def set_subtitles(self, subtitles, player: xbmc.Player):
     if subtitles:
@@ -127,6 +158,7 @@ class Player:
       log(f"Adding all {len(subtitles)} subs")
       for subtitle_url in subtitles[::-1]:
         player.setSubtitles(subtitle_url)
+
 
   def handle_retry_on_failure(
       self,

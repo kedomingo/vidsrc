@@ -4,7 +4,7 @@ import hashlib
 from urllib.parse import quote
 
 from util.util import log, build_url, append_dicts
-from util.cache import get_cached, cache_response
+from util.cache import cache_get, cache_put
 
 BASE_URL = "https://api.themoviedb.org/3"
 
@@ -15,21 +15,21 @@ class TmdbClient:
 
 
   def list_genres(self, type):
-    cached = get_cached(cache_key=type, cache_group='genre')
+    cached = cache_get(cache_key=type, cache_group='genre')
     if cached:
       log(f"genre::{type}- cache hit")
       return cached
 
     url = f"{BASE_URL}/genre/{type}/list?api_key={self.api_key}"
     data = self.__get(url)
-    cache_response(type, data, cache_group='genre')
+    cache_put(type, data, cache_group='genre')
 
     return data
 
 
   def trending(self, type, page=1):
     cachekey = f'{type}.{page}'
-    cached = get_cached(cache_key=cachekey, cache_group='trending',
+    cached = cache_get(cache_key=cachekey, cache_group='trending',
                         not_older_than_days=7)
     if cached:
       log(f"trending::{cachekey}- cache hit")
@@ -37,7 +37,7 @@ class TmdbClient:
 
     url = f"{BASE_URL}/trending/{type}/day?api_key={self.api_key}&page={page}"
     data = self.__get(url)
-    cache_response(cachekey, data, cache_group='trending')
+    cache_put(cachekey, data, cache_group='trending')
 
     return data
 
@@ -46,7 +46,7 @@ class TmdbClient:
     cachekey = hashlib.md5(str(params).encode()).hexdigest()
     cachekey = f'{cachekey}.{page}'
 
-    cached = get_cached(cache_key=cachekey, cache_group='discover',
+    cached = cache_get(cache_key=cachekey, cache_group='discover',
                         not_older_than_days=14)
     if cached:
       log(f"discover- cache hit")
@@ -79,7 +79,7 @@ class TmdbClient:
     log(f"Discover URL {url}")
 
     data = self.__get(url)
-    cache_response(cachekey, data, cache_group='discover')
+    cache_put(cachekey, data, cache_group='discover')
     log(f'cached {cachekey}')
 
     return data
@@ -95,14 +95,14 @@ class TmdbClient:
     show movie details if type=movie, get details + seasons if type=tv
     """
     cachekey = f'{type}.{tmdb_id}'
-    cached = get_cached(cache_key=cachekey, cache_group='show_details')
+    cached = cache_get(cache_key=cachekey, cache_group='show_details')
     if cached:
       log(f"show_details::{cachekey} cache hit")
       return cached
 
     url = f"{BASE_URL}/{type}/{tmdb_id}?api_key={self.api_key}"
     data = self.__get(url)
-    cache_response(cachekey, data, cache_group='show_details')
+    cache_put(cachekey, data, cache_group='show_details')
     return data
 
 
@@ -111,7 +111,7 @@ class TmdbClient:
     get season details + episodes
     """
     cachekey = f'{tmdb_id}.{season_number}'
-    cached = get_cached(cache_key=cachekey, cache_group='season_details')
+    cached = cache_get(cache_key=cachekey, cache_group='season_details')
     if cached:
       log(f"season_details::{cachekey} cache hit")
       return cached
@@ -119,7 +119,7 @@ class TmdbClient:
     log(f"season_details::{cachekey} cache miss")
     url = f"{BASE_URL}/tv/{tmdb_id}/season/{season_number}?api_key={self.api_key}"
     data = self.__get(url)
-    cache_response(cachekey, data, cache_group='season_details')
+    cache_put(cachekey, data, cache_group='season_details')
 
     return data
 

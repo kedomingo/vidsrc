@@ -1,6 +1,7 @@
 import json
 import os
 import shutil
+import random
 from datetime import datetime
 from pathlib import Path
 
@@ -8,7 +9,7 @@ import xbmcvfs
 from util.util import log
 
 
-def get_cached(cache_key, cache_group=None, not_older_than_days=-1):
+def cache_get(cache_key, cache_group=None, not_older_than_days=-1):
   cache_group = cache_group if cache_group is not None else str(cache_key)[0]
   file_path = get_cache_path(cache_key, cache_group)
   if not os.path.isfile(file_path):
@@ -30,7 +31,7 @@ def get_cached(cache_key, cache_group=None, not_older_than_days=-1):
   return None
 
 
-def cache_response(cache_key, response, cache_group=None):
+def cache_put(cache_key, response, cache_group=None):
   cache_group = cache_group if cache_group is not None else str(cache_key)[0]
   file_path = get_cache_path(cache_key, cache_group)
 
@@ -43,7 +44,9 @@ def cache_response(cache_key, response, cache_group=None):
     handle.write(json.dumps(payload))
     log(f'Written {file_path}')
 
-  cleanup()
+  # cleanup 20% of the time
+  if (random.random() * 1000) < 200:
+    __cleanup()
 
 
 def get_cache_path(cachekey, cachegroup):
@@ -58,7 +61,7 @@ def get_cache_dir():
   return f"{tempdir}/cache"
 
 
-def cleanup():
+def __cleanup():
   """
   delete cache older than 30 days
   """
@@ -71,7 +74,7 @@ def cleanup():
         year, month, day = map(int, folder.name.split("-"))
         folder_date = datetime(year, month, day).date()
 
-        if (today - folder_date).days > 30:
+        if (today - folder_date).days > (30 * 6): # 6 months
           shutil.rmtree(folder)
       except Exception as e:
         continue
