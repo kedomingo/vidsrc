@@ -66,4 +66,6 @@ for dir in "$PLUGIN_DIR"/*/; do
     cp "$ZIP_DIR/$dir_name/$dir_name-$next_version.zip" ~
 done
 
+md5 -q zips/addons.xml > zips/addons.xml.md5
+
 echo "Build complete"

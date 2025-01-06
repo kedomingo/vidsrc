@@ -5,8 +5,8 @@ from util.util import log, build_url
 
 BASE_URL = "https://api.themoviedb.org/3"
 
-# SERVER_ADDRESS = 'http://firestreamarr.xyz:8080'
-SERVER_ADDRESS = 'http://localhost:8080'
+SERVER_ADDRESS = 'http://firestreamarr.xyz:8080'
+# SERVER_ADDRESS = 'http://localhost:8080'
 
 class FirestreamarrClient:
 
