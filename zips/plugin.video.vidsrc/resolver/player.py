@@ -69,6 +69,9 @@ class Player:
     # Resolved successfully
     ####################
 
+    if str(playback_url).startswith('/'):
+      playback_url = self.__fs_client.selfhosted(playback_url)
+
     log(f"Playing {playback_url}")
 
     # Create a ListItem for playback
@@ -170,7 +173,7 @@ class Player:
       if len(subtitles) == 1:
         engsub = str(subtitles[0])
         if engsub.startswith('/'):
-          engsub = self.__fs_client.subtitle(engsub)
+          engsub = self.__fs_client.selfhosted(engsub)
         log(f"Found engsub {engsub}")
         player.setSubtitles(engsub)
         return

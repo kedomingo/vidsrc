@@ -18,5 +18,5 @@ class FirestreamarrClient:
     log(f"Got response {result.text}")
     return json.loads(result.text)
 
-  def subtitle(self, path):
+  def selfhosted(self, path):
     return f'{SERVER_ADDRESS}{path}'
